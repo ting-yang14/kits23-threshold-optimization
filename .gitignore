@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+.python-version
+*.pth
+.DS_Store
+/models
+/logs
