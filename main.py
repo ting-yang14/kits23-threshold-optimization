@@ -4,6 +4,7 @@ import torch
 import yaml
 import matplotlib.pyplot as plt
 from datetime import datetime
+import numpy as np
 
 # 添加專案根目錄到路徑
 # import setup_path
@@ -12,6 +13,7 @@ from envs.custom_env import ProbabilityThresholdEnv
 from agents.dqn_agent import DQNAgent
 from train.train_dqn import train_dqn
 from evaluate.eval_policy import evaluate_agent
+from utils.plotting import plot_metrics_with_rewards
 
 
 def load_config(config_path="configs/dqn_config.yaml"):
@@ -60,7 +62,7 @@ def main():
     agent = DQNAgent(state_dim, action_dim, device)
 
     # 訓練代理
-    rewards = train_dqn(
+    rewards, accuracies, precisions, recalls, f1s = train_dqn(
         train_env,
         agent,
         num_episodes=config["train"]["num_episodes"],
@@ -88,11 +90,7 @@ def main():
     os.makedirs("logs", exist_ok=True)
 
     # 繪製學習曲線
-    plt.figure(figsize=(10, 5))
-    plt.plot(rewards)
-    plt.title("DQN Learning Curve")
-    plt.xlabel("Episode")
-    plt.ylabel("Episode Reward")
+    fig = plot_metrics_with_rewards(rewards, accuracies, precisions, recalls, f1s)
     curve_path = f"logs/learning_curve_{run_id}.png"
     plt.savefig(curve_path)
     print(f"Learning curve saved to {curve_path}")
