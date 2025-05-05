@@ -85,6 +85,8 @@ class ProbabilityThresholdEnv(gym.Env):
             print(f"Loaded testing dataset with {len(self.data)} samples")
         # Environment configuration
         self.current_index = 0
+        self.y_true = []
+        self.y_pred = []
 
     def _balance_dataset(self, target_samples: int):
         """
@@ -202,30 +204,35 @@ class ProbabilityThresholdEnv(gym.Env):
 
         return clf_thresholds
 
-    def _get_reward(self, row, clf_thresholds):
+    def _get_prediction(self, row, clf_thresholds):
         """
-        Calculate reward based on classifier predictions and thresholds.
+        Calculate prediction based on classifier probabilities and thresholds.
 
         Args:
             row (pd.Series): Data row containing classifier probabilities
             clf_thresholds (dict): Classifier thresholds
 
         Returns:
+            int: Prediction value
+        """
+        votes = []
+        for clf, threshold in clf_thresholds.items():
+            pred = int(row[f"{clf}_prob"] >= threshold)
+            votes.append(pred)
+        return 1 if sum(votes) >= len(votes) / 2 else 0
+
+    def _get_reward(self, pred, ground_truth):
+        """
+        Calculate reward based on prediction and ground truth.
+
+        Args:
+            pred (int): Prediction value
+            ground_truth (int): Ground truth value
+
+        Returns:
             float: Reward value
         """
-        correct = []
-        ground_truth = row["ground_truth"]
-        for clf, threshold in clf_thresholds.items():
-            # 預測機率>= 閾值, 預測結果為1, 且ground_truth=1
-            if row[f"{clf}_prob"] >= threshold and ground_truth == 1:
-                correct.append(1)
-            # 預測機率< 閾值, 預測結果為0, 且ground_truth=0
-            elif row[f"{clf}_prob"] < threshold and ground_truth == 0:
-                correct.append(1)
-            else:
-                correct.append(0)
-        reward = 1 if sum(correct) / len(correct) >= 0.5 else 0
-        return reward
+        return 1.0 if pred == ground_truth else 0
 
     def step(self, action):
         """
@@ -248,7 +255,10 @@ class ProbabilityThresholdEnv(gym.Env):
         row = self.data.iloc[self.current_index]
 
         # 計算獎勵
-        reward = self._get_reward(row, clf_thresholds)
+        pred = self._get_prediction(row, clf_thresholds)
+        ground_truth = row["ground_truth"]
+        reward = self._get_reward(pred, ground_truth)
+        info = {"prediction": pred, "ground_truth": ground_truth}
 
         # 移動到下一個數據點
         self.current_index += 1
@@ -259,7 +269,7 @@ class ProbabilityThresholdEnv(gym.Env):
         # 獲取下一個狀態
         next_state = self._get_observation()
 
-        return (next_state, reward, done, False, {})
+        return (next_state, reward, done, False, info)
 
     def render(self, mode="human"):
         """Render the current environment state."""

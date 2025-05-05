@@ -8,7 +8,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 現在嘗試匯入 setup_path
-import setup_path
+
 import setup_path
 from buffer.buffer import ReplayBuffer
 from rlmodels.dqn_model import DQN
