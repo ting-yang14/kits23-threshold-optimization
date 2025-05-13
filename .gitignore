@@ -11,5 +11,5 @@ wheels/
 .python-version
 *.pth
 .DS_Store
-/models
 /logs
+/checkpoints

@@ -98,10 +98,10 @@ def train_dqn(env, agent, num_episodes=1000, max_steps=500, learn_interval=10):
             }
 
             # 確保logs目錄存在
-            os.makedirs("logs", exist_ok=True)
-
+            os.makedirs("logs/progress", exist_ok=True)
+            train_progress_path = f"logs/progress/training_progress_{run_id}.json"
             # 儲存結果
-            with open(f"logs/training_progress_{run_id}.json", "w") as f:
+            with open(train_progress_path, "w") as f:
                 json.dump(results, f, indent=4)
 
     return rewards, accuracies, precisions, recalls, f1s

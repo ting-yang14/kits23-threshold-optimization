@@ -75,13 +75,13 @@ def main():
     )
 
     # 確保模型目錄存在
-    os.makedirs("models", exist_ok=True)
+    os.makedirs("checkpoints", exist_ok=True)
 
     # 儲存時間戳
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # 保存經過訓練的代理
-    model_path = f"models/dqn_model_{run_id}.pth"
+    model_path = f"checkpoints/dqn_model_{run_id}.pth"
     agent.save(model_path)
     print(f"Model saved to {model_path}")
 
@@ -91,11 +91,11 @@ def main():
     )
 
     # 確保logs目錄存在
-    os.makedirs("logs", exist_ok=True)
+    os.makedirs("logs/train", exist_ok=True)
 
     # 繪製學習曲線
     fig = plot_metrics_with_rewards(rewards, accuracies, precisions, recalls, f1s)
-    curve_path = f"logs/learning_curve_{run_id}.png"
+    curve_path = f"logs/train/learning_curve_{run_id}.png"
     plt.savefig(curve_path)
     print(f"Learning curve saved to {curve_path}")
 
@@ -119,13 +119,17 @@ def main():
     }
 
     # 儲存結果
-    with open(f"logs/training_results_{run_id}.json", "w") as f:
+    training_results_path = f"logs/train/training_results_{run_id}.json"
+    with open(training_results_path, "w") as f:
         import json
 
         json.dump(results, f, indent=4)
 
-    print(f"Training results saved to logs/training_results_{run_id}.json")
+    print(f"Training results saved to {training_results_path}")
 
 
 if __name__ == "__main__":
     main()
+
+# sample command to run the script
+# python main.py --config configs/dqn_config.yaml

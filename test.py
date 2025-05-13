@@ -72,10 +72,10 @@ def test_trained_model(model_path):
     }
 
     # 確保logs目錄存在
-    os.makedirs("logs", exist_ok=True)
-
+    os.makedirs("logs/test", exist_ok=True)
+    test_results_path = f"logs/test/test_results_{run_id}.json"
     # 儲存結果
-    with open(f"logs/test_results_{run_id}.json", "w") as f:
+    with open(test_results_path, "w") as f:
         json.dump(results, f, indent=4)
 
     return reward, accuracy, precision, recall, f1, ground_truth, predictions
@@ -110,3 +110,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# sample command to run the script
+# python test.py --model checkpoints/dqn_model_20250513_172716.pth
