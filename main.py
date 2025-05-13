@@ -57,7 +57,11 @@ def main():
     action_dim = train_env.action_space.n
 
     # 創建 DQN 代理
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps" if torch.backends.mps.is_available() else "cpu"
+    )
     print(f"Using device: {device}")
     agent = DQNAgent(state_dim, action_dim, device)
 
@@ -82,8 +86,8 @@ def main():
     print(f"Model saved to {model_path}")
 
     # 評估代理
-    avg_reward, std_reward = evaluate_agent(
-        test_env, agent, config["eval"]["num_episodes"]
+    reward, accuracy, precision, recall, f1, ground_truth, predictions = evaluate_agent(
+        test_env, agent
     )
 
     # 確保logs目錄存在
@@ -99,8 +103,16 @@ def main():
     results = {
         "run_id": run_id,
         "model_path": model_path,
-        "avg_reward": float(avg_reward),
-        "std_reward": float(std_reward),
+        "training_reward": rewards,
+        "training_accuracy": accuracies,
+        "training_precision": precisions,
+        "training_recall": recalls,
+        "training_f1": f1s,
+        "test_reward": reward,
+        "test_accuracy": accuracy,
+        "test_precision": precision,
+        "test_recall": recall,
+        "test_f1": f1,
         "num_episodes": config["train"]["num_episodes"],
         "max_steps": config["train"]["max_steps"],
         "config": config,

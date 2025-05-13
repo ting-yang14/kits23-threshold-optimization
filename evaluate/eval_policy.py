@@ -1,26 +1,35 @@
 import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 
-def evaluate_agent(env, agent, num_episodes=10):
+def evaluate_agent(env, agent):
     """評估 DQN 代理"""
-    total_rewards = []
+    state, _ = env.reset()
+    reward = 0
+    done = False
+    truncated = False
+    ground_truth = []
+    predictions = []
 
-    for _ in range(num_episodes):
-        state, _ = env.reset()
-        episode_reward = 0
-        done = False
-        truncated = False
+    while not (done or truncated):
+        action = agent.get_action(state, eval_mode=True)
+        next_state, reward, done, truncated, info = env.step(action)
+        state = next_state
+        reward += reward
+        ground_truth.append(info["ground_truth"])
+        predictions.append(info["prediction"])
 
-        while not (done or truncated):
-            action = agent.get_action(state, eval_mode=True)
-            next_state, reward, done, truncated, _ = env.step(action)
-            state = next_state
-            episode_reward += reward
+    accuracy = accuracy_score(ground_truth, predictions)
+    f1 = f1_score(ground_truth, predictions, zero_division=0)
+    precision = precision_score(ground_truth, predictions, zero_division=0)
+    recall = recall_score(ground_truth, predictions, zero_division=0)
 
-        total_rewards.append(episode_reward)
-
-    avg_reward = np.mean(total_rewards)
-    std_reward = np.std(total_rewards)
-    print(f"Evaluation: Avg Reward: {avg_reward:.2f} +/- {std_reward:.2f}")
-
-    return avg_reward, std_reward
+    return (
+        reward,
+        accuracy,
+        precision,
+        recall,
+        f1,
+        ground_truth,
+        predictions,
+    )

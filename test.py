@@ -11,6 +11,7 @@ from datetime import datetime
 from envs.custom_env import ProbabilityThresholdEnv
 from agents.dqn_agent import DQNAgent
 from evaluate.eval_policy import evaluate_agent
+from utils.plotting import plot_confusion_matrix
 
 
 def load_config(config_path="configs/dqn_config.yaml"):
@@ -41,21 +42,31 @@ def test_trained_model(model_path):
     action_dim = test_env.action_space.n
 
     # 創建並載入模型
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps" if torch.backends.mps.is_available() else "cpu"
+    )
+    print(f"Using device: {device}")
     agent = DQNAgent(state_dim, action_dim, device)
     agent.load(model_path)
 
     # 評估模型
-    avg_reward, std_reward = evaluate_agent(
-        test_env, agent, config["eval"]["num_episodes"]
+    reward, accuracy, precision, recall, f1, ground_truth, predictions = evaluate_agent(
+        test_env, agent
     )
 
     # 記錄結果
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     results = {
         "model_path": model_path,
-        "avg_reward": float(avg_reward),
-        "std_reward": float(std_reward),
+        "reward": reward,
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "ground_truth": ground_truth,
+        "predictions": predictions,
         "timestamp": run_id,
     }
 
@@ -66,7 +77,7 @@ def test_trained_model(model_path):
     with open(f"logs/test_results_{run_id}.json", "w") as f:
         json.dump(results, f, indent=4)
 
-    return avg_reward, std_reward
+    return reward, accuracy, precision, recall, f1, ground_truth, predictions
 
 
 if __name__ == "__main__":
@@ -76,4 +87,10 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, required=True, help="模型路徑")
     args = parser.parse_args()
 
-    test_trained_model(args.model)
+    reward, accuracy, precision, recall, f1, ground_truth, predictions = (
+        test_trained_model(args.model)
+    )
+    print(
+        f"Testing Results - Reward: {reward:.2f}, Accuracy: {accuracy:.2f}, "
+        f"Precision: {precision:.2f}, Recall: {recall:.2f}, F1: {f1:.2f}"
+    )
