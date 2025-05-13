@@ -1,7 +1,42 @@
 # utils/plotting.py
-
+import seaborn as sns
+import os
+from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import numpy as np
+
+
+def plot_confusion_matrix(y_true, y_pred, title="Confusion Matrix", save_file=None):
+    """
+    Plot and optionally save a confusion matrix.
+    """
+    plt.figure(figsize=(8, 6))
+    labels = [0, 1]
+    label_names = ["Benign", "Malignant"]
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=label_names,
+        yticklabels=label_names,
+    )
+    plt.title(title)
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+    plt.tight_layout()
+
+    if save_file:
+        os.makedirs(os.path.dirname(save_file), exist_ok=True)
+        plt.savefig(save_file)
+        print(f"Confusion Matrix saved to: {save_file}")
+    else:
+        plt.show()
+
+    plt.close()
+    return cm
 
 
 def plot_metrics_with_rewards(rewards, accuracies, precisions, recalls, f1s):

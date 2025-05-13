@@ -3,6 +3,7 @@ import sys
 import torch
 import yaml
 import json
+import argparse
 from datetime import datetime
 
 # 添加專案根目錄到路徑
@@ -80,17 +81,32 @@ def test_trained_model(model_path):
     return reward, accuracy, precision, recall, f1, ground_truth, predictions
 
 
-if __name__ == "__main__":
-    import argparse
-
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, required=True, help="模型路徑")
+    parser.add_argument(
+        "--model", type=str, required=True, help="Path to the trained model (.pth)"
+    )
     args = parser.parse_args()
 
     reward, accuracy, precision, recall, f1, ground_truth, predictions = (
         test_trained_model(args.model)
     )
+
     print(
         f"Testing Results - Reward: {reward:.2f}, Accuracy: {accuracy:.2f}, "
         f"Precision: {precision:.2f}, Recall: {recall:.2f}, F1: {f1:.2f}"
     )
+
+    model_name = os.path.splitext(os.path.basename(args.model))[0]
+    save_file = os.path.join("logs", "test", f"{model_name}_confusion_matrix.png")
+
+    plot_confusion_matrix(
+        y_true=ground_truth,
+        y_pred=predictions,
+        title=f"Confusion Matrix - {model_name}",
+        save_file=save_file,
+    )
+
+
+if __name__ == "__main__":
+    main()
