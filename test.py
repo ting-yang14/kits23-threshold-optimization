@@ -57,8 +57,6 @@ def test_trained_model(model_path):
         test_env, agent
     )
 
-    # 記錄結果
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     results = {
         "model_path": model_path,
         "reward": reward,
@@ -68,17 +66,9 @@ def test_trained_model(model_path):
         "f1": f1,
         "ground_truth": ground_truth,
         "predictions": predictions,
-        "timestamp": run_id,
     }
 
-    # 確保logs目錄存在
-    os.makedirs("logs/test", exist_ok=True)
-    test_results_path = f"logs/test/test_results_{run_id}.json"
-    # 儲存結果
-    with open(test_results_path, "w") as f:
-        json.dump(results, f, indent=4)
-
-    return reward, accuracy, precision, recall, f1, ground_truth, predictions
+    return results
 
 
 def main():
@@ -88,21 +78,25 @@ def main():
     )
     args = parser.parse_args()
 
-    reward, accuracy, precision, recall, f1, ground_truth, predictions = (
-        test_trained_model(args.model)
-    )
+    results = test_trained_model(args.model)
 
     print(
-        f"Testing Results - Reward: {reward:.2f}, Accuracy: {accuracy:.2f}, "
-        f"Precision: {precision:.2f}, Recall: {recall:.2f}, F1: {f1:.2f}"
+        f"Testing Results - Reward: {results['reward']:.2f}, Accuracy: {results['accuracy']:.2f}, "
+        f"Precision: {results['precision']:.2f}, Recall: {results['recall']:.2f}, F1: {results['f1']:.2f}"
     )
 
     model_name = os.path.splitext(os.path.basename(args.model))[0]
+    os.makedirs("logs/test", exist_ok=True)
+    test_results_path = os.path.join("logs", "test", f"test_results_{model_name}.json")
+    with open(test_results_path, "w") as f:
+        json.dump(results, f, indent=4)
+    print(f"Test results saved to {test_results_path}")
+    # 繪製混淆矩陣
     save_file = os.path.join("logs", "test", f"{model_name}_confusion_matrix.png")
 
     plot_confusion_matrix(
-        y_true=ground_truth,
-        y_pred=predictions,
+        y_true=results["ground_truth"],
+        y_pred=results["predictions"],
         title=f"Confusion Matrix - {model_name}",
         save_file=save_file,
     )
