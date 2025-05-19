@@ -43,11 +43,7 @@ def test_trained_model(model_path):
     action_dim = test_env.action_space.n
 
     # 創建並載入模型
-    device = torch.device(
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps" if torch.backends.mps.is_available() else "cpu"
-    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     agent = DQNAgent(state_dim, action_dim, device)
     agent.load(model_path)

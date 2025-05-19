@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import setup_path
 from buffer.buffer import ReplayBuffer
-from rlmodels.dqn_model import DQN
+from models.dqn_model import DQN
 
 
 # 定義 DQN Agent
@@ -23,14 +23,14 @@ class DQNAgent:
 
         # 讀取超參數 (可從 config 傳入)
         self.gamma = kwargs.get("gamma", 0.99)
-        self.epsilon_start = kwargs.get("epsilon_start", 1.0)
+        self.epsilon_start = kwargs.get("epsilon_start", 0.9)
         self.epsilon_end = kwargs.get("epsilon_end", 0.05)
-        self.epsilon_decay = kwargs.get("epsilon_decay", 10000)
-        self.target_update = kwargs.get("target_update", 1000)
+        self.epsilon_decay = kwargs.get("epsilon_decay", 1000)
         self.memory_size = kwargs.get("memory_size", 10000)
         self.batch_size = kwargs.get("batch_size", 64)
         self.learning_rate = kwargs.get("learning_rate", 1e-4)
-
+        self.target_update = kwargs.get("target_update", 1000)
+        self.tau = kwargs.get("tau", 0.01)
         # Q 網絡
         self.policy_net = DQN(state_dim, action_dim).to(device)
         self.target_net = DQN(state_dim, action_dim).to(device)

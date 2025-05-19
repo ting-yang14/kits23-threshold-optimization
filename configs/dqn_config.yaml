@@ -1,4 +1,3 @@
-# DQN Agent配置
 agent:
   gamma: 0.99
   epsilon_start: 0.9
@@ -9,23 +8,23 @@ agent:
   learning_rate: 0.0001
   target_update: 1000
   tau: 0.005
-
-# 訓練配置
 train:
-  num_episodes: 300
-  max_steps: 1000
+  num_episodes: 500
+  max_steps: 5000
   learn_interval: 10
-  save_interval: 50
-  eval_interval: 50
-
-# 環境配置
 env:
-  train_data: "./data/rl_train.csv"
-  test_data: "./data/rl_test.csv"
-  rf_bounds: [0.89, 0.93]
-  xgb_bounds: [0.96, 1.0]
-  svm_bounds: [0.88, 0.92]
+  train_data: ./data/rl_train.csv
+  test_data: ./data/rl_test.csv
+  rf_bounds:
+    - 0.89
+    - 0.93
+  xgb_bounds:
+    - 0.96
+    - 1.0
+  svm_bounds:
+    - 0.88
+    - 0.92
   step_size: 0.01
-  num_clf: 1
+  num_clf: 3
   max_n_steps: 10000
   random_seed: 42
