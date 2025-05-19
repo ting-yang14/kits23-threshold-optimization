@@ -45,15 +45,21 @@ class ProbabilityThresholdEnv(gym.Env):
             0 <= rf_bounds[0] < rf_bounds[1] <= 1
         ), f"Invalid rf_bounds: {rf_bounds}. Must satisfy 0 <= rf_bounds[0] < rf_bounds[1] <= 1."
 
-        self.rf_thresholds = np.arange(rf_bounds[0], rf_bounds[1], step_size)
+        self.rf_thresholds = np.round(
+            np.arange(rf_bounds[0], rf_bounds[1], step_size), 2
+        )
         assert (
             0 <= xgb_bounds[0] < xgb_bounds[1] <= 1
         ), f"Invalid xgb_bounds: {xgb_bounds}. Must satisfy 0 <= xgb_bounds[0] < xgb_bounds[1] <= 1."
-        self.xgb_thresholds = np.arange(xgb_bounds[0], xgb_bounds[1], step_size)
+        self.xgb_thresholds = np.round(
+            np.arange(xgb_bounds[0], xgb_bounds[1], step_size), 2
+        )
         assert (
             0 <= svm_bounds[0] < svm_bounds[1] <= 1
         ), f"Invalid svm_bounds: {svm_bounds}. Must satisfy 0 <= svm_bounds[0] < svm_bounds[1] <= 1."
-        self.svm_thresholds = np.arange(svm_bounds[0], svm_bounds[1], step_size)
+        self.svm_thresholds = np.round(
+            np.arange(svm_bounds[0], svm_bounds[1], step_size), 2
+        )
 
         # Calculate action space size: product of threshold options
         num_rf_thresholds = len(self.rf_thresholds)

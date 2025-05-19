@@ -13,6 +13,8 @@ def evaluate_agent(env, agent):
 
     while not (done or truncated):
         action = agent.get_action(state, eval_mode=True)
+        clf_thresholds = env._get_action_clf_threshold(action)
+        print(f"Step action: {action}, Thresholds: {clf_thresholds}")
         next_state, reward, done, truncated, info = env.step(action)
         state = next_state
         overall_reward += reward
