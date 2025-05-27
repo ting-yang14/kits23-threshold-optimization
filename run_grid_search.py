@@ -6,8 +6,13 @@ import os
 
 CONFIG_PATH = "configs/dqn_config.yaml"
 
-# 所有組合
+# 實驗設置
 bound_sets = [
+    # {
+    # "rf_bounds": [0.5, 1],
+    # "xgb_bounds": [0.5, 1],
+    # "svm_bounds": [0.5, 1],
+    # },
     {
         "rf_bounds": [0.85, 0.95],
         "xgb_bounds": [0.9, 1.0],
@@ -19,6 +24,8 @@ bound_sets = [
         "svm_bounds": [0.88, 0.92],
     },
 ]
+# [TP, TN, FP, FN]
+reward_schemes = [[1, 1, 0, 0], [1, 1, -1, -1]]
 
 num_clf_options = [1, 2, 3]
 
@@ -55,6 +62,7 @@ def run_experiment(config):
         f"rf={config['env']['rf_bounds']}, "
         f"xgb={config['env']['xgb_bounds']}, "
         f"svm={config['env']['svm_bounds']}"
+        f"reward_scheme={config['env']['reward_scheme']}"
     )
 
     # 執行 main.py
@@ -73,9 +81,12 @@ def run_experiment(config):
 if __name__ == "__main__":
     base_config = load_config(CONFIG_PATH)
 
-    for bounds, num_clf in itertools.product(bound_sets, num_clf_options):
+    for bounds, num_clf, reward_scheme in itertools.product(
+        bound_sets, num_clf_options, reward_schemes
+    ):
         config = base_config.copy()
         config["env"].update(bounds)
         config["env"]["num_clf"] = num_clf
+        config["env"]["reward_scheme"] = reward_scheme
 
         run_experiment(config)
