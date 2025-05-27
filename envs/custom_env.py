@@ -3,33 +3,68 @@ from gymnasium import spaces
 import pandas as pd
 import numpy as np
 from sklearn.utils import resample
-from typing import List, Tuple, Dict
+from typing import Tuple, Dict, Optional
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 class ProbabilityThresholdEnv(gym.Env):
+    """A Gymnasium environment for optimizing classifier thresholds in a reinforcement learning setting."""
+
+    metadata = {"render_modes": ["human"]}
+    MAX_EPISODE_SEEDS = 1000
+    MAX_SEED_VALUE = 2**32
+
     def __init__(
         self,
         csv_path: str,
-        rf_bounds=(0.85, 0.90),
-        xgb_bounds=(0.85, 0.90),
-        svm_bounds=(0.85, 0.90),
-        step_size=0.01,
+        rf_bounds: Tuple[float, float] = (0.85, 0.90),
+        xgb_bounds: Tuple[float, float] = (0.85, 0.90),
+        svm_bounds: Tuple[float, float] = (0.85, 0.90),
+        step_size: float = 0.01,
         isTrain: bool = True,
         num_clf: int = 3,
         max_n_steps: int = 10000,
         random_seed: int = 42,
     ):
+        """
+        Initialize the ProbabilityThresholdEnv environment.
 
+        Args:
+            csv_path (str): Path to CSV file containing classifier probabilities and ground truth.
+            rf_bounds (Tuple[float, float]): Bounds for Random Forest threshold (min, max).
+            xgb_bounds (Tuple[float, float]): Bounds for XGBoost threshold (min, max).
+            svm_bounds (Tuple[float, float]): Bounds for SVM threshold (min, max).
+            step_size (float): Step size for generating threshold values.
+            isTrain (bool): Whether to use training mode (with data balancing).
+            num_clf (int): Number of classifiers to use (1, 2, or 3).
+            max_n_steps (int): Target number of samples for training data balancing.
+            random_seed (int): Random seed for reproducibility.
+        """
         super(ProbabilityThresholdEnv, self).__init__()
         self.random_seed = random_seed
-        # Load data from CSV
-        self.data = pd.read_csv(csv_path)
-        assert all(
-            col in self.data.columns for col in ["rf_prob", "xgb_prob", "svm_prob"]
-        ), "CSV must contain columns: rf_prob, xgb_prob, svm_prob"
+        # 使用隨機數生成器
+        self.rng = np.random.default_rng(random_seed)
+        # 為每個episode生成隨機種子
+        self.episode_seeds = self.rng.integers(
+            0, self.MAX_SEED_VALUE, size=self.MAX_EPISODE_SEEDS
+        )
+        self.current_episode = 0
+        self.isTrain = isTrain
 
-        # Ensure probability values are between 0 and 1
+        # Validate num_clf
+        assert num_clf in [1, 2, 3], "num_clf must be 1, 2, or 3"
+        self.num_clf = num_clf
+
+        # Load and validate data from CSV
+        self.data = pd.read_csv(csv_path)
+        required_columns = ["rf_prob", "xgb_prob", "svm_prob", "ground_truth"]
+        assert all(
+            col in self.data.columns for col in required_columns
+        ), f"CSV must contain columns: {', '.join(required_columns)}"
+        assert (
+            self.data["ground_truth"].isin([0, 1]).all()
+        ), "ground_truth column must contain only 0 or 1"
+
         for col in ["rf_prob", "xgb_prob", "svm_prob"]:
             assert (
                 (self.data[col] >= 0) & (self.data[col] <= 1)
@@ -40,46 +75,47 @@ class ProbabilityThresholdEnv(gym.Env):
             low=0.0, high=1.0, shape=(3,), dtype=np.float32
         )
 
-        # Calculate threshold values
+        # Calculate and validate threshold values
         assert (
             0 <= rf_bounds[0] < rf_bounds[1] <= 1
-        ), f"Invalid rf_bounds: {rf_bounds}. Must satisfy 0 <= rf_bounds[0] < rf_bounds[1] <= 1."
-
-        self.rf_thresholds = np.round(
-            np.arange(rf_bounds[0], rf_bounds[1], step_size), 2
-        )
+        ), f"Invalid rf_bounds: {rf_bounds}. Must satisfy 0 <= rf_bounds[0] < rf_bounds[1] <= 1"
         assert (
             0 <= xgb_bounds[0] < xgb_bounds[1] <= 1
-        ), f"Invalid xgb_bounds: {xgb_bounds}. Must satisfy 0 <= xgb_bounds[0] < xgb_bounds[1] <= 1."
-        self.xgb_thresholds = np.round(
-            np.arange(xgb_bounds[0], xgb_bounds[1], step_size), 2
-        )
+        ), f"Invalid xgb_bounds: {xgb_bounds}. Must satisfy 0 <= xgb_bounds[0] < xgb_bounds[1] <= 1"
         assert (
             0 <= svm_bounds[0] < svm_bounds[1] <= 1
-        ), f"Invalid svm_bounds: {svm_bounds}. Must satisfy 0 <= svm_bounds[0] < svm_bounds[1] <= 1."
-        self.svm_thresholds = np.round(
-            np.arange(svm_bounds[0], svm_bounds[1], step_size), 2
+        ), f"Invalid svm_bounds: {svm_bounds}. Must satisfy 0 <= svm_bounds[0] < svm_bounds[1] <= 1"
+
+        self.rf_thresholds = np.unique(np.arange(rf_bounds[0], rf_bounds[1], step_size))
+        self.xgb_thresholds = np.unique(
+            np.arange(xgb_bounds[0], xgb_bounds[1], step_size)
+        )
+        self.svm_thresholds = np.unique(
+            np.arange(svm_bounds[0], svm_bounds[1], step_size)
         )
 
-        # Calculate action space size: product of threshold options
-        num_rf_thresholds = len(self.rf_thresholds)
-        num_xgb_thresholds = len(self.xgb_thresholds)
-        num_svm_thresholds = len(self.svm_thresholds)
-
-        self.num_clf = num_clf
+        # Validate thresholds
+        for name, thresholds in [
+            ("rf", self.rf_thresholds),
+            ("xgb", self.xgb_thresholds),
+            ("svm", self.svm_thresholds),
+        ]:
+            if len(thresholds) == 0:
+                raise ValueError(
+                    f"No valid thresholds for {name} with bounds {locals()[f'{name}_bounds']} and step_size {step_size}"
+                )
+        # Calculate action space size
+        num_rf = len(self.rf_thresholds)
+        num_xgb = len(self.xgb_thresholds)
+        num_svm = len(self.svm_thresholds)
 
         if self.num_clf == 1:
-            total_actions = num_rf_thresholds + num_xgb_thresholds + num_svm_thresholds
+            total_actions = num_rf + num_xgb + num_svm
         elif self.num_clf == 2:
-            total_actions = (
-                num_rf_thresholds * num_xgb_thresholds
-                + num_rf_thresholds * num_svm_thresholds
-                + num_xgb_thresholds * num_svm_thresholds
-            )
+            total_actions = num_rf * num_xgb + num_rf * num_svm + num_xgb * num_svm
         else:
-            total_actions = num_rf_thresholds * num_xgb_thresholds * num_svm_thresholds
+            total_actions = num_rf * num_xgb * num_svm
 
-        # Set action space
         self.action_space = spaces.Discrete(total_actions)
 
         # Shuffle and balance data
@@ -89,10 +125,11 @@ class ProbabilityThresholdEnv(gym.Env):
         else:
             self.num_rows = len(self.data)
             print(f"Loaded testing dataset with {len(self.data)} samples")
-        # Environment configuration
+
         self.current_index = 0
         self.y_true = []
         self.y_pred = []
+        self.shuffled_indices = list(range(self.num_rows))
 
     def _balance_dataset(self, target_samples: int):
         """
@@ -104,7 +141,16 @@ class ProbabilityThresholdEnv(gym.Env):
         data_majority = self.data[self.data["ground_truth"] == 1]
         data_minority = self.data[self.data["ground_truth"] == 0]
 
+        if len(data_majority) == 0 or len(data_minority) == 0:
+            raise ValueError("Dataset must contain samples for both classes (0 and 1)")
+
+        target_per_class = max(
+            target_samples // 2, max(len(data_majority), len(data_minority))
+        )
+
         def resample_class(data, target):
+            if len(data) == 0:
+                raise ValueError("Cannot resample an empty class")
             if len(data) > target:
                 return resample(
                     data, replace=False, n_samples=target, random_state=self.random_seed
@@ -113,7 +159,6 @@ class ProbabilityThresholdEnv(gym.Env):
                 data, replace=True, n_samples=target, random_state=self.random_seed
             )
 
-        target_per_class = target_samples // 2
         data_majority = resample_class(data_majority, target_per_class)
         data_minority = resample_class(data_minority, target_per_class)
 
@@ -124,93 +169,119 @@ class ProbabilityThresholdEnv(gym.Env):
         )
         self.num_rows = len(self.data)
 
-    def reset(self, seed=None):
-        """Reset the environment for a new episode."""
+    def reset(self, seed: Optional[int] = None) -> Tuple[np.ndarray, Dict]:
+        """
+        Reset the environment for a new episode.
+
+        Args:
+            seed (Optional[int]): Seed for reproducibility. Overrides default seed if provided.
+
+        Returns:
+            Tuple[np.ndarray, Dict]: Initial observation and info dictionary.
+        """
+        if seed is not None:
+            self.rng = np.random.default_rng(seed)
+            self.episode_seeds = self.rng.integers(
+                0, self.MAX_SEED_VALUE, size=self.MAX_EPISODE_SEEDS
+            )
+            self.current_episode = 0
+
         super().reset(seed=seed)
+        if self.isTrain:
+            episode_seed = self.episode_seeds[
+                self.current_episode % len(self.episode_seeds)
+            ]
+            self.episode_rng = np.random.default_rng(episode_seed)
+            self.current_episode += 1
+            self.shuffled_indices = self.episode_rng.permutation(self.num_rows).tolist()
+        else:
+            self.episode_rng = self.rng
+            self.shuffled_indices = list(range(self.num_rows))
+
         self.current_index = 0
+        self.y_true = []
+        self.y_pred = []
+        self.episode_step_count = 0
 
         return self._get_observation(), {}
 
     def _get_observation(self) -> np.ndarray:
-        """Get current environment observation."""
-        if self.current_index >= self.num_rows:  # 修正: 使用 >= 而不是 +1 >
+        """
+        Get current environment observation.
+
+        Returns:
+            np.ndarray: Array of classifier probabilities [rf_prob, xgb_prob, svm_prob].
+        """
+        if self.current_index >= self.num_rows:
             return np.zeros(3, dtype=np.float32)
 
-        row = self.data.iloc[self.current_index]
+        row = self.data.iloc[self.shuffled_indices[self.current_index]]
         return np.array(
             [row["rf_prob"], row["xgb_prob"], row["svm_prob"]], dtype=np.float32
         )
 
     def _get_action_clf_threshold(self, action) -> Dict[str, float]:
         """
-        將動作轉換為分類器閾值配置
+        Convert action index to classifier threshold configuration.
 
         Args:
-            action (int): 動作索引
+            action (int): Action index
 
         Returns:
-            Dict[str, float]: 分類器及其閾值的字典映射
+            Dict[str, float]: Dictionary mapping classifiers to their thresholds
+
+        Action indexing scheme:
+        - num_clf=1: [rf thresholds, xgb thresholds, svm thresholds]
+        - num_clf=2: [rf+xgb pairs, rf+svm pairs, xgb+svm pairs]
+        - num_clf=3: [rf * xgb * svm combinations]
         """
         clf_thresholds = {}
-        num_rf_thresholds = len(self.rf_thresholds)
-        num_xgb_thresholds = len(self.xgb_thresholds)
-        num_svm_thresholds = len(self.svm_thresholds)
+        num_rf = len(self.rf_thresholds)
+        num_xgb = len(self.xgb_thresholds)
+        num_svm = len(self.svm_thresholds)
 
-        # 一個分類器的情況
         if self.num_clf == 1:
-            if action < num_rf_thresholds:
+            if action < num_rf:
                 clf_thresholds["rf"] = self.rf_thresholds[action]
-            elif action < num_rf_thresholds + num_xgb_thresholds:
-                clf_thresholds["xgb"] = self.xgb_thresholds[action - num_rf_thresholds]
+            elif action < num_rf + num_xgb:
+                clf_thresholds["xgb"] = self.xgb_thresholds[action - num_rf]
             else:
-                clf_thresholds["svm"] = self.svm_thresholds[
-                    action - num_rf_thresholds - num_xgb_thresholds
-                ]
+                clf_thresholds["svm"] = self.svm_thresholds[action - num_rf - num_xgb]
 
-        # 兩個分類器的情況
         elif self.num_clf == 2:
-            # RF + XGB 組合
-            rf_xgb_combinations = num_rf_thresholds * num_xgb_thresholds
-            # RF + SVM 組合
-            rf_svm_combinations = num_rf_thresholds * num_svm_thresholds
+            rf_xgb_combinations = num_rf * num_xgb
+            rf_svm_combinations = num_rf * num_svm
 
             if action < rf_xgb_combinations:
-                # 計算 RF 和 XGB 的閾值索引
-                rf_idx = action // num_xgb_thresholds
-                xgb_idx = action % num_xgb_thresholds
+                rf_idx = action // num_xgb
+                xgb_idx = action % num_xgb
                 clf_thresholds["rf"] = self.rf_thresholds[rf_idx]
                 clf_thresholds["xgb"] = self.xgb_thresholds[xgb_idx]
-
             elif action < rf_xgb_combinations + rf_svm_combinations:
-                # 計算 RF 和 SVM 的閾值索引
-                remaining_action = action - rf_xgb_combinations
-                rf_idx = remaining_action // num_svm_thresholds
-                svm_idx = remaining_action % num_svm_thresholds
+                action = action - rf_xgb_combinations
+                rf_idx = action // num_svm
+                svm_idx = action % num_svm
                 clf_thresholds["rf"] = self.rf_thresholds[rf_idx]
                 clf_thresholds["svm"] = self.svm_thresholds[svm_idx]
-
             else:
-                # 計算 XGB 和 SVM 的閾值索引
-                remaining_action = action - rf_xgb_combinations - rf_svm_combinations
-                xgb_idx = remaining_action // num_svm_thresholds
-                svm_idx = remaining_action % num_svm_thresholds
+                action = action - rf_xgb_combinations - rf_svm_combinations
+                xgb_idx = action // num_svm
+                svm_idx = action % num_svm
                 clf_thresholds["xgb"] = self.xgb_thresholds[xgb_idx]
                 clf_thresholds["svm"] = self.svm_thresholds[svm_idx]
 
-        # 三個分類器的情況
-        else:
-            rf_idx = action // (num_xgb_thresholds * num_svm_thresholds)
-            remaining = action % (num_xgb_thresholds * num_svm_thresholds)
-            xgb_idx = remaining // num_svm_thresholds
-            svm_idx = remaining % num_svm_thresholds
-
+        else:  # num_clf == 3
+            rf_idx = action // (num_xgb * num_svm)
+            remaining = action % (num_xgb * num_svm)
+            xgb_idx = remaining // num_svm
+            svm_idx = remaining % num_svm
             clf_thresholds["rf"] = self.rf_thresholds[rf_idx]
             clf_thresholds["xgb"] = self.xgb_thresholds[xgb_idx]
             clf_thresholds["svm"] = self.svm_thresholds[svm_idx]
 
         return clf_thresholds
 
-    def _get_prediction(self, row, clf_thresholds):
+    def _get_prediction(self, row: pd.Series, clf_thresholds: Dict[str, float]) -> int:
         """
         Calculate prediction based on classifier probabilities and thresholds.
 
@@ -227,9 +298,9 @@ class ProbabilityThresholdEnv(gym.Env):
             votes.append(pred)
         return 1 if sum(votes) >= len(votes) / 2 else 0
 
-    def _get_reward(self, pred, ground_truth):
+    def _get_reward(self, pred: int, ground_truth: int) -> float:
         """
-        Calculate reward based on prediction and ground truth.
+        Calculate reward based on prediction and ground truth using reward scheme.
 
         Args:
             pred (int): Prediction value
@@ -238,9 +309,17 @@ class ProbabilityThresholdEnv(gym.Env):
         Returns:
             float: Reward value
         """
-        return 1.0 if pred == ground_truth else 0
+        if pred == 1 and ground_truth == 1:
+            return 1.0
+        else:
+            # 不懲罰誤判
+            return 0.0
+            # 惡性被判為良性扣較多分
+            # return -0.5 if pred == 0 and ground_truth == 1 else -0.2
+            # 良性被判為惡性扣較多分
+            # return -0.5 if pred == 1 and ground_truth == 0 else -0.2
 
-    def step(self, action):
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict]:
         """
         Execute an action in the environment.
 
@@ -248,38 +327,55 @@ class ProbabilityThresholdEnv(gym.Env):
             action (int): Action index that will be translated to classifier thresholds
 
         Returns:
-            Tuple containing next state, reward, done flag, truncated flag, and info dict
+            Tuple[np.ndarray, float, bool, bool, Dict]: Next state, reward, done flag, truncated flag, and info dict
         """
-        # 修正：不再傳入多餘的參數
+        # Check for termination
+        if (self.isTrain and self.current_index >= self.num_rows) or (
+            not self.isTrain and self.current_index >= self.num_rows
+        ):
+            return np.zeros(3, dtype=np.float32), 0.0, True, False, {}
+
         clf_thresholds = self._get_action_clf_threshold(action)
+        row = self.data.iloc[self.shuffled_indices[self.current_index]]
 
-        # 如果已經超出數據範圍，返回終止狀態
-        if self.current_index >= self.num_rows:
-            return (np.zeros(3, dtype=np.float32), 0.0, True, False, {})
-
-        # 獲取當前數據行
-        row = self.data.iloc[self.current_index]
-
-        # 計算獎勵
+        # Calculate reward and prediction
         pred = self._get_prediction(row, clf_thresholds)
         ground_truth = row["ground_truth"]
+        self.y_true.append(ground_truth)
+        self.y_pred.append(pred)
         reward = self._get_reward(pred, ground_truth)
-        info = {"prediction": pred, "ground_truth": ground_truth}
 
-        # 移動到下一個數據點
+        # Move to next data point
         self.current_index += 1
+        done = self.current_index >= self.num_rows
 
-        # 檢查是否結束
-        done = True if self.current_index >= self.num_rows else False
-
-        # 獲取下一個狀態
+        # Get next state
         next_state = self._get_observation()
 
-        return (next_state, reward, done, False, info)
+        info = {"prediction": pred, "ground_truth": ground_truth}
 
-    def render(self, mode="human"):
-        """Render the current environment state."""
+        return next_state, reward, done, False, info
+
+    def render(self, mode: str = "human"):
+        """
+        Render the current environment state.
+
+        Args:
+            mode (str): Rendering mode, only 'human' is supported.
+        """
+        if mode != "human":
+            raise NotImplementedError(f"Render mode {mode} not supported")
+
         if self.current_index < self.num_rows:
-            print(f"Step {self.current_index}: State = {self._get_observation()}")
+            state = self._get_observation()
+            row = self.data.iloc[self.shuffled_indices[self.current_index]]
+            print(f"Step {self.current_index}:")
+            print(
+                f"  State: rf_prob={state[0]:.3f}, xgb_prob={state[1]:.3f}, svm_prob={state[2]:.3f}"
+            )
+            print(f"  Ground Truth: {row['ground_truth']}")
+            print(
+                f"  Episode Accuracy: {np.mean([p == t for p, t in zip(self.y_pred, self.y_true)]):.3f}"
+            )
         else:
             print("Environment finished")
