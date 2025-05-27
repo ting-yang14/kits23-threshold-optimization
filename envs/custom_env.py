@@ -20,6 +20,7 @@ class ProbabilityThresholdEnv(gym.Env):
         rf_bounds: Tuple[float, float] = (0.85, 0.90),
         xgb_bounds: Tuple[float, float] = (0.85, 0.90),
         svm_bounds: Tuple[float, float] = (0.85, 0.90),
+        reward_scheme: Tuple[float, float, float, float] = (1.0, 1, -0.5, -0.2),
         step_size: float = 0.01,
         isTrain: bool = True,
         num_clf: int = 3,
@@ -42,6 +43,7 @@ class ProbabilityThresholdEnv(gym.Env):
         """
         super(ProbabilityThresholdEnv, self).__init__()
         self.random_seed = random_seed
+        self.reward_scheme = reward_scheme
         # 使用隨機數生成器
         self.rng = np.random.default_rng(random_seed)
         # 為每個episode生成隨機種子
@@ -310,14 +312,13 @@ class ProbabilityThresholdEnv(gym.Env):
             float: Reward value
         """
         if pred == 1 and ground_truth == 1:
-            return 1.0
-        else:
-            # 不懲罰誤判
-            return 0.0
-            # 惡性被判為良性扣較多分
-            # return -0.5 if pred == 0 and ground_truth == 1 else -0.2
-            # 良性被判為惡性扣較多分
-            # return -0.5 if pred == 1 and ground_truth == 0 else -0.2
+            return self.reward_scheme[0]  # TP
+        elif pred == 0 and ground_truth == 0:
+            return self.reward_scheme[1]  # TN
+        elif pred == 1 and ground_truth == 0:
+            return self.reward_scheme[2]  # FP
+        elif pred == 0 and ground_truth == 1:
+            return self.reward_scheme[3]  # FN
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict]:
         """

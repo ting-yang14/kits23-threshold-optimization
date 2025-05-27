@@ -7,10 +7,9 @@ agent:
   batch_size: 64
   learning_rate: 0.0001
   target_update: 1000
-  tau: 0.005
 train:
   num_episodes: 500
-  max_steps: 5000
+  max_steps: 3000
   learn_interval: 10
 env:
   train_data: ./data/rl_train.csv
@@ -24,7 +23,8 @@ env:
   svm_bounds:
     - 0.88
     - 0.92
+  reward_scheme: [1, 1, 0, 0]
   step_size: 0.01
-  num_clf: 3
+  num_clf: 2
   max_n_steps: 10000
   random_seed: 42
