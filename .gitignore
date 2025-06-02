@@ -13,3 +13,7 @@ wheels/
 .DS_Store
 /logs
 /checkpoints
+
+# data files
+*.csv
+*.xlsx

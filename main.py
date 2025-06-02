@@ -2,6 +2,8 @@ import os
 import sys
 import torch
 import yaml
+import time
+import json
 import matplotlib.pyplot as plt
 from datetime import datetime
 import numpy as np
@@ -14,6 +16,7 @@ from agents.dqn_agent import DQNAgent
 from train.train_dqn import train_dqn
 from evaluate.eval_policy import evaluate_agent
 from utils.plotting import plot_metrics_with_rewards
+from utils.summarize import summarize_training_results
 
 
 def load_config(config_path="configs/dqn_config.yaml"):
@@ -119,11 +122,13 @@ def main():
     # 儲存結果
     training_results_path = f"logs/train/training_results_{run_id}.json"
     with open(training_results_path, "w") as f:
-        import json
-
         json.dump(results, f, indent=4)
 
     print(f"Training results saved to {training_results_path}")
+
+    time.sleep(3)  # 等待文件系統穩定
+    # 總結訓練結果
+    _ = summarize_training_results("logs/train", "training_summary.csv")
 
 
 if __name__ == "__main__":
