@@ -21,6 +21,7 @@ def train_dqn(env, agent, num_episodes=1000, max_steps=500, learn_interval=10):
     precisions = []
     recalls = []
     f1s = []
+
     for episode in tqdm(range(num_episodes)):
         state, _ = env.reset()
         episode_reward = 0
@@ -66,10 +67,10 @@ def train_dqn(env, agent, num_episodes=1000, max_steps=500, learn_interval=10):
         )
 
         rewards.append(episode_reward)
-        accuracies.append(episode_accuracy)
-        precisions.append(episode_precision)
-        recalls.append(episode_recall)
-        f1s.append(episode_f1)
+        accuracies.append(np.round(episode_accuracy, 2))
+        precisions.append(np.round(episode_precision, 2))
+        recalls.append(np.round(episode_recall, 2))
+        f1s.append(np.round(episode_f1, 2))
         # 打印進度
         if episode % 10 == 0:
             avg_reward = np.mean(rewards[-10:])

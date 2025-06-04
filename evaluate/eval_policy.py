@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 def evaluate_agent(env, agent):
     """評估 DQN 代理"""
     state, _ = env.reset()
-    overall_reward = 0
+    episode_reward = 0
     done = False
     truncated = False
     ground_truth = []
@@ -17,7 +17,7 @@ def evaluate_agent(env, agent):
         print(f"Step action: {action}, Thresholds: {clf_thresholds}")
         next_state, reward, done, truncated, info = env.step(action)
         state = next_state
-        overall_reward += reward
+        episode_reward += reward
         ground_truth.append(info["ground_truth"])
         predictions.append(info["prediction"])
 
@@ -27,7 +27,7 @@ def evaluate_agent(env, agent):
     recall = recall_score(ground_truth, predictions, zero_division=0)
 
     return (
-        overall_reward,
+        episode_reward,
         accuracy,
         precision,
         recall,

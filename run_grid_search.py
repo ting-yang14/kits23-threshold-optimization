@@ -3,6 +3,7 @@ import subprocess
 import itertools
 import time
 import os
+from utils.utils import load_config, save_config
 
 CONFIG_PATH = "configs/dqn_config.yaml"
 
@@ -28,16 +29,6 @@ bound_sets = [
 reward_schemes = [[1, 1, 0, 0], [1, 1, -1, -1]]
 
 num_clf_options = [1, 2, 3]
-
-
-def load_config(path):
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
-
-
-def save_config(config, path):
-    with open(path, "w") as f:
-        yaml.dump(config, f, sort_keys=False)
 
 
 def get_latest_checkpoint(checkpoint_dir="checkpoints"):

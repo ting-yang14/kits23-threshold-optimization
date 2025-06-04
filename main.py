@@ -1,7 +1,5 @@
 import os
-import sys
 import torch
-import yaml
 import time
 import json
 import matplotlib.pyplot as plt
@@ -11,51 +9,32 @@ import numpy as np
 # 添加專案根目錄到路徑
 # import setup_path
 
-from envs.custom_env import ProbabilityThresholdEnv
+
 from agents.dqn_agent import DQNAgent
 from train.train_dqn import train_dqn
 from evaluate.eval_policy import evaluate_agent
-from utils.plotting import plot_metrics_with_rewards
+from utils.plotting import plot_metrics_with_rewards, plot_confusion_matrix
 from utils.summarize import summarize_training_results
-
-
-def load_config(config_path="configs/dqn_config.yaml"):
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config
+from utils.utils import (
+    load_config,
+    create_env,
+    ensure_log_dirs_exist,
+    save_results_to_json,
+)
 
 
 def main():
+    # 確保logs目錄存在
+    ensure_log_dirs_exist()
+
     # 載入配置
     config = load_config()
 
     # 創建環境
-    train_env = ProbabilityThresholdEnv(
-        csv_path=config["env"]["train_data"],
-        rf_bounds=config["env"]["rf_bounds"],
-        xgb_bounds=config["env"]["xgb_bounds"],
-        svm_bounds=config["env"]["svm_bounds"],
-        reward_scheme=config["env"]["reward_scheme"],
-        step_size=config["env"]["step_size"],
-        isTrain=True,
-        num_clf=config["env"]["num_clf"],
-        max_n_steps=config["env"]["max_n_steps"],
-        random_seed=config["env"]["random_seed"],
-    )
+    train_env = create_env(config, is_train=True)
 
     # 創建測試環境
-    test_env = ProbabilityThresholdEnv(
-        csv_path=config["env"]["test_data"],
-        rf_bounds=config["env"]["rf_bounds"],
-        xgb_bounds=config["env"]["xgb_bounds"],
-        svm_bounds=config["env"]["svm_bounds"],
-        reward_scheme=config["env"]["reward_scheme"],
-        step_size=config["env"]["step_size"],
-        isTrain=False,
-        num_clf=config["env"]["num_clf"],
-        max_n_steps=config["env"]["max_n_steps"],
-        random_seed=config["env"]["random_seed"],
-    )
+    test_env = create_env(config, is_train=False)
 
     # 獲取環境的維度
     state_dim = train_env.observation_space.shape[0]
@@ -75,30 +54,47 @@ def main():
         learn_interval=config["train"]["learn_interval"],
     )
 
-    # 確保模型目錄存在
-    os.makedirs("checkpoints", exist_ok=True)
-
     # 儲存時間戳
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # 保存經過訓練的代理
-    model_path = f"checkpoints/dqn_model_{run_id}.pth"
+    model_path = f"logs/checkpoints/dqn_model_{run_id}.pth"
     agent.save(model_path)
     print(f"Model saved to {model_path}")
 
-    # 評估代理
-    reward, accuracy, precision, recall, f1, ground_truth, predictions = evaluate_agent(
-        test_env, agent
-    )
-
-    # 確保logs目錄存在
-    os.makedirs("logs/train", exist_ok=True)
+    learning_curve_path = f"logs/train/learning_curve_{run_id}.png"
 
     # 繪製學習曲線
-    fig = plot_metrics_with_rewards(rewards, accuracies, precisions, recalls, f1s)
-    curve_path = f"logs/train/learning_curve_{run_id}.png"
-    plt.savefig(curve_path)
-    print(f"Learning curve saved to {curve_path}")
+    _ = plot_metrics_with_rewards(
+        rewards,
+        accuracies,
+        precisions,
+        recalls,
+        f1s,
+        save_path=learning_curve_path,
+        show=False,
+    )
+    print(f"Learning curve saved to {learning_curve_path}")
+
+    # 評估代理
+    (
+        test_reward,
+        test_accuracy,
+        test_precision,
+        test_recall,
+        test_f1,
+        ground_truth,
+        predictions,
+    ) = evaluate_agent(test_env, agent)
+
+    confusion_matrix_path = f"logs/test/dqn_model_{run_id}_confusion_matrix.png"
+    _ = plot_confusion_matrix(
+        y_true=ground_truth,
+        y_pred=predictions,
+        save_path=confusion_matrix_path,
+        show=False,
+    )
+    print(f"Confusion Matrix saved to {confusion_matrix_path}")
 
     # 記錄結果
     results = {
@@ -109,11 +105,11 @@ def main():
         "training_precision": precisions,
         "training_recall": recalls,
         "training_f1": f1s,
-        "test_reward": reward,
-        "test_accuracy": accuracy,
-        "test_precision": precision,
-        "test_recall": recall,
-        "test_f1": f1,
+        "test_reward": test_reward,
+        "test_accuracy": test_accuracy,
+        "test_precision": test_precision,
+        "test_recall": test_recall,
+        "test_f1": test_f1,
         "num_episodes": config["train"]["num_episodes"],
         "max_steps": config["train"]["max_steps"],
         "config": config,
@@ -121,9 +117,7 @@ def main():
 
     # 儲存結果
     training_results_path = f"logs/train/training_results_{run_id}.json"
-    with open(training_results_path, "w") as f:
-        json.dump(results, f, indent=4)
-
+    save_results_to_json(results, training_results_path)
     print(f"Training results saved to {training_results_path}")
 
     time.sleep(3)  # 等待文件系統穩定

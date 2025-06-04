@@ -30,7 +30,6 @@ class DQNAgent:
         self.batch_size = kwargs.get("batch_size", 64)
         self.learning_rate = kwargs.get("learning_rate", 1e-4)
         self.target_update = kwargs.get("target_update", 1000)
-        self.tau = kwargs.get("tau", 0.01)
         # Q 網絡
         self.policy_net = DQN(state_dim, action_dim).to(device)
         self.target_net = DQN(state_dim, action_dim).to(device)

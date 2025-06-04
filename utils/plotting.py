@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_confusion_matrix(y_true, y_pred, title="Confusion Matrix", save_file=None):
+def plot_confusion_matrix(y_true, y_pred, save_path, show=False):
     """
     Plot and optionally save a confusion matrix.
     """
@@ -23,23 +23,25 @@ def plot_confusion_matrix(y_true, y_pred, title="Confusion Matrix", save_file=No
         xticklabels=label_names,
         yticklabels=label_names,
     )
-    plt.title(title)
+
+    plt.title("Confusion Matrix")
     plt.xlabel("Predicted Label")
     plt.ylabel("True Label")
     plt.tight_layout()
 
-    if save_file:
-        os.makedirs(os.path.dirname(save_file), exist_ok=True)
-        plt.savefig(save_file)
-        print(f"Confusion Matrix saved to: {save_file}")
-    else:
-        plt.show()
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
     return cm
 
 
-def plot_metrics_with_rewards(rewards, accuracies, precisions, recalls, f1s):
+def plot_metrics_with_rewards(
+    rewards, accuracies, precisions, recalls, f1s, save_path, show=False
+):
     fig, axs = plt.subplots(2, 2, figsize=(14, 10))
     metrics = {
         "Accuracy": accuracies,
@@ -52,7 +54,6 @@ def plot_metrics_with_rewards(rewards, accuracies, precisions, recalls, f1s):
     ma_window = 10
     ma_style = "-"
     metric_style = reward_style = "--"
-    alpha_ma = 1
     alpha_reward = alpha_metric = 0.3
     reward_color = "tab:blue"
     metric_color = "tab:green"
@@ -126,4 +127,9 @@ def plot_metrics_with_rewards(rewards, accuracies, precisions, recalls, f1s):
     fig.suptitle("Training Performance Metrics", fontsize=15)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.subplots_adjust(hspace=0.35, wspace=0.3)
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
     return fig
