@@ -44,35 +44,3 @@ def create_env(config, is_train=True):
         max_n_steps=config["env"]["max_n_steps"],
         random_seed=config["env"]["random_seed"],
     )
-
-
-def evaluate_and_save(agent, env, model_path, log_dir="logs/test"):
-    reward, accuracy, precision, recall, f1, ground_truth, predictions = evaluate_agent(
-        env, agent
-    )
-    results = {
-        "model_path": model_path,
-        "reward": reward,
-        "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
-        "ground_truth": ground_truth,
-        "predictions": predictions,
-    }
-    model_name = os.path.splitext(os.path.basename(model_path))[0]
-    os.makedirs(log_dir, exist_ok=True)
-    results_path = os.path.join(log_dir, f"test_results_{model_name}.json")
-    with open(results_path, "w") as f:
-        json.dump(results, f, indent=4)
-    print(f"Test results saved to {results_path}")
-
-    # Plot confusion matrix
-    save_file = os.path.join(log_dir, f"{model_name}_confusion_matrix.png")
-    plot_confusion_matrix(
-        y_true=ground_truth,
-        y_pred=predictions,
-        title=f"Confusion Matrix - {model_name}",
-        save_file=save_file,
-    )
-    return results

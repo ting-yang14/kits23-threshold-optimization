@@ -1,17 +1,9 @@
-import os
-import sys
-import torch
 import numpy as np
-import yaml
-import matplotlib.pyplot as plt
 from tqdm import tqdm
-import json
 from datetime import datetime
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
-# 添加專案根目錄到路徑
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import setup_path
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from utils.utils import save_results_to_json
 
 
 def train_dqn(env, agent, num_episodes=1000, max_steps=500, learn_interval=10):
@@ -98,11 +90,9 @@ def train_dqn(env, agent, num_episodes=1000, max_steps=500, learn_interval=10):
                 "timestamp": run_id,
             }
 
-            # 確保logs目錄存在
-            os.makedirs("logs/progress", exist_ok=True)
-            train_progress_path = f"logs/progress/training_progress_{run_id}.json"
-            # 儲存結果
-            with open(train_progress_path, "w") as f:
-                json.dump(results, f, indent=4)
+            progress_result_path = (
+                f"logs/progress/{agent.algorithm}_{run_id}_train_progress.json"
+            )
+            save_results_to_json(results, progress_result_path)
 
     return rewards, accuracies, precisions, recalls, f1s

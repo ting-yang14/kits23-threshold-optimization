@@ -3,23 +3,39 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 import random
-import os
-import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# 現在嘗試匯入 setup_path
-
-import setup_path
+from typing import Optional
 from buffer.buffer import ReplayBuffer
 from models.dqn_model import DQN
+from models.dueling_dqn_model import DuelingDQN
 
 
 # 定義 DQN Agent
 class DQNAgent:
-    def __init__(self, state_dim, action_dim, device="cpu", **kwargs):
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        device: str = "cpu",
+        algorithm: str = "dqn",
+        **kwargs,
+    ):
+        """
+        Initalize the DQN Agent.
+        :param state_dim: Dimension of the state space
+        :param action_dim: Number of possible actions
+        :param device: Device for computation ('cpu' or 'cuda')
+        :param algorithm: Algorithm type ('dqn', 'ddqn', 'dueling_dqn')
+        :param kwargs: Additional hyperparameters for the agent
+        """
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.device = device
+        self.algorithm = algorithm.lower()
+        if self.algorithm not in ["dqn", "ddqn", "dueling_dqn"]:
+            raise ValueError(
+                f"Unsupported algorithm: {self.algorithm}. Supported algorithms are 'dqn', 'ddqn', 'dueling_dqn'."
+            )
 
         # 讀取超參數 (可從 config 傳入)
         self.gamma = kwargs.get("gamma", 0.99)
@@ -30,9 +46,19 @@ class DQNAgent:
         self.batch_size = kwargs.get("batch_size", 64)
         self.learning_rate = kwargs.get("learning_rate", 1e-4)
         self.target_update = kwargs.get("target_update", 1000)
+        self.hidden_dim = kwargs.get("hidden_dim", 128)
         # Q 網絡
-        self.policy_net = DQN(state_dim, action_dim).to(device)
-        self.target_net = DQN(state_dim, action_dim).to(device)
+        if self.algorithm == "dueling_dqn":
+            self.policy_net = DuelingDQN(state_dim, action_dim, self.hidden_dim).to(
+                device
+            )
+            self.target_net = DuelingDQN(state_dim, action_dim, self.hidden_dim).to(
+                device
+            )
+        else:
+            self.policy_net = DQN(state_dim, action_dim, self.hidden_dim).to(device)
+            self.target_net = DQN(state_dim, action_dim, self.hidden_dim).to(device)
+
         self.update_target_network()
         self.target_net.eval()  # 設置為評估模式
 
@@ -50,7 +76,7 @@ class DQNAgent:
         """將策略網絡的權重複製到目標網絡"""
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
-    def get_action(self, state, eval_mode=False):
+    def get_action(self, state: np.ndarray, eval_mode: bool = False) -> int:
         """使用epsilon-greedy策略選擇動作"""
         # 逐步減小 epsilon 值
         self.epsilon = self.epsilon_end + (
@@ -71,10 +97,9 @@ class DQNAgent:
                 state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
                 q_values = self.policy_net(state_tensor)
                 return q_values.argmax().item()
-        else:
-            return random.randrange(self.action_dim)
+        return random.randrange(self.action_dim)
 
-    def learn(self):
+    def learn(self) -> Optional[float]:
         """從回放緩衝區更新策略網絡"""
         if not self.memory.can_provide_sample(self.batch_size):
             return None
@@ -92,9 +117,16 @@ class DQNAgent:
         # 計算當前 Q 值：Q(s, a)
         current_q_values = self.policy_net(states).gather(1, actions)
 
-        # 計算目標 Q 值：r + γ * max_a' Q_target(s', a')
+        # Target Q-values
         with torch.no_grad():
-            next_q_values = self.target_net(next_states).max(1, keepdim=True)[0]
+            if self.algorithm == "dueling_dqn":
+                # Dueling DQN 用policy_net計算Q值
+                next_actions = self.policy_net(next_states).argmax(1, keepdim=True)
+                next_q_values = self.target_net(next_states).gather(1, next_actions)
+            else:
+                # DQN 和 DDQN 用target_net計算Q值
+                next_q_values = self.target_net(next_states).max(1, keepdim=True)[0]
+            # 計算目標 Q 值：r + γ * max_a' Q_target(s', a')
             target_q_values = rewards + self.gamma * next_q_values * (1 - dones)
 
         # 計算 Huber 損失
@@ -109,7 +141,7 @@ class DQNAgent:
 
         return loss.item()
 
-    def save(self, path):
+    def save(self, path: str):
         """保存模型"""
         torch.save(
             {
@@ -118,14 +150,19 @@ class DQNAgent:
                 "optimizer": self.optimizer.state_dict(),
                 "steps_done": self.steps_done,
                 "epsilon": self.epsilon,
+                "algorithm": self.algorithm,
             },
             path,
         )
 
-    def load(self, path):
+    def load(self, path: str):
         """載入模型"""
-        # checkpoint = torch.load(path)
         checkpoint = torch.load(path, weights_only=False)
+        if checkpoint.get("algorithm", "dqn") != self.algorithm:
+            print(
+                f"Warning: Loading checkpoint from {checkpoint.get('algorithm')} into {self.algorithm} agent."
+            )
+
         self.policy_net.load_state_dict(checkpoint["policy_net"])
         self.target_net.load_state_dict(checkpoint["target_net"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])

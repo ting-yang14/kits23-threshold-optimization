@@ -1,14 +1,9 @@
-import os
 import torch
 import time
-import json
 import matplotlib.pyplot as plt
 from datetime import datetime
 import numpy as np
-
-# 添加專案根目錄到路徑
-# import setup_path
-
+import argparse
 
 from agents.dqn_agent import DQNAgent
 from train.train_dqn import train_dqn
@@ -23,13 +18,13 @@ from utils.utils import (
 )
 
 
-def main():
+def main(config_file="configs/dqn_config.yaml", algorithm="dqn"):
     # 確保logs目錄存在
     ensure_log_dirs_exist()
 
     # 載入配置
-    config = load_config()
-
+    config = load_config(config_file)
+    config["algorithm"] = algorithm
     # 創建環境
     train_env = create_env(config, is_train=True)
 
@@ -39,11 +34,13 @@ def main():
     # 獲取環境的維度
     state_dim = train_env.observation_space.shape[0]
     action_dim = train_env.action_space.n
-
+    print(f"State dimension: {state_dim}, Action dimension: {action_dim}")
     # 創建 DQN 代理
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    agent = DQNAgent(state_dim, action_dim, device)
+    agent = DQNAgent(
+        state_dim, action_dim, device, algorithm=algorithm, **config["agent"]
+    )
 
     # 訓練代理
     rewards, accuracies, precisions, recalls, f1s = train_dqn(
@@ -58,14 +55,14 @@ def main():
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # 保存經過訓練的代理
-    model_path = f"logs/checkpoints/dqn_model_{run_id}.pth"
+    model_path = f"logs/checkpoints/{algorithm}_{run_id}.pth"
     agent.save(model_path)
     print(f"Model saved to {model_path}")
 
-    learning_curve_path = f"logs/train/learning_curve_{run_id}.png"
+    learning_curve_path = f"logs/train/{algorithm}_{run_id}_learning_curve.png"
 
     # 繪製學習曲線
-    _ = plot_metrics_with_rewards(
+    plot_metrics_with_rewards(
         rewards,
         accuracies,
         precisions,
@@ -87,8 +84,8 @@ def main():
         predictions,
     ) = evaluate_agent(test_env, agent)
 
-    confusion_matrix_path = f"logs/test/dqn_model_{run_id}_confusion_matrix.png"
-    _ = plot_confusion_matrix(
+    confusion_matrix_path = f"logs/test/{algorithm}_{run_id}_confusion_matrix.png"
+    plot_confusion_matrix(
         y_true=ground_truth,
         y_pred=predictions,
         save_path=confusion_matrix_path,
@@ -110,23 +107,36 @@ def main():
         "test_precision": test_precision,
         "test_recall": test_recall,
         "test_f1": test_f1,
-        "num_episodes": config["train"]["num_episodes"],
-        "max_steps": config["train"]["max_steps"],
         "config": config,
     }
 
     # 儲存結果
-    training_results_path = f"logs/train/training_results_{run_id}.json"
+    training_results_path = f"logs/train/{algorithm}_{run_id}_train_results.json"
     save_results_to_json(results, training_results_path)
     print(f"Training results saved to {training_results_path}")
 
     time.sleep(3)  # 等待文件系統穩定
     # 總結訓練結果
-    _ = summarize_training_results("logs/train", "training_summary.csv")
+    summarize_training_results("logs/train", "training_summary.csv")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="DQN Training Script")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="configs/dqn_config.yaml",
+        help="Path to the configuration file",
+    )
+    parser.add_argument(
+        "--algorithm",
+        type=str,
+        default="dqn",
+        choices=["dqn", "ddqn", "dueling_dqn"],
+        help="Algorithm type",
+    )
+    args = parser.parse_args()
+    main(config_file=args.config, algorithm=args.algorithm)
 
 # sample command to run the script
-# python main.py --config configs/dqn_config.yaml
+# python main.py --config configs/dqn_config.yaml --algorithm dqn
