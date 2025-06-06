@@ -25,16 +25,16 @@ class DQNAgent:
         :param state_dim: Dimension of the state space
         :param action_dim: Number of possible actions
         :param device: Device for computation ('cpu' or 'cuda')
-        :param algorithm: Algorithm type ('dqn', 'ddqn', 'dueling_dqn')
+        :param algorithm: Algorithm type ('dqn', 'ddqn', 'dueling_dqn', 'dueling_ddqn')
         :param kwargs: Additional hyperparameters for the agent
         """
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.device = device
         self.algorithm = algorithm.lower()
-        if self.algorithm not in ["dqn", "ddqn", "dueling_dqn"]:
+        if self.algorithm not in ["dqn", "ddqn", "dueling_dqn", "dueling_ddqn"]:
             raise ValueError(
-                f"Unsupported algorithm: {self.algorithm}. Supported algorithms are 'dqn', 'ddqn', 'dueling_dqn'."
+                f"Unsupported algorithm: {self.algorithm}. Supported algorithms are 'dqn', 'ddqn', 'dueling_dqn', 'dueling_ddqn'."
             )
 
         # 讀取超參數 (可從 config 傳入)
@@ -47,8 +47,10 @@ class DQNAgent:
         self.learning_rate = kwargs.get("learning_rate", 1e-4)
         self.target_update = kwargs.get("target_update", 1000)
         self.hidden_dim = kwargs.get("hidden_dim", 128)
+        self.use_ddqn = self.algorithm in ["ddqn", "dueling_ddqn"]
+        self.use_dueling = self.algorithm in ["dueling_dqn", "dueling_ddqn"]
         # Q 網絡
-        if self.algorithm == "dueling_dqn":
+        if self.use_dueling:
             self.policy_net = DuelingDQN(state_dim, action_dim, self.hidden_dim).to(
                 device
             )
@@ -119,12 +121,12 @@ class DQNAgent:
 
         # Target Q-values
         with torch.no_grad():
-            if self.algorithm == "dueling_dqn":
-                # Dueling DQN 用policy_net計算Q值
+            if self.use_ddqn:
+                # Double DQN: argmax from policy_net, Q-values for target_net
                 next_actions = self.policy_net(next_states).argmax(1, keepdim=True)
                 next_q_values = self.target_net(next_states).gather(1, next_actions)
             else:
-                # DQN 和 DDQN 用target_net計算Q值
+                # DQN: max from target_net
                 next_q_values = self.target_net(next_states).max(1, keepdim=True)[0]
             # 計算目標 Q 值：r + γ * max_a' Q_target(s', a')
             target_q_values = rewards + self.gamma * next_q_values * (1 - dones)
@@ -168,3 +170,4 @@ class DQNAgent:
         self.optimizer.load_state_dict(checkpoint["optimizer"])
         self.steps_done = checkpoint.get("steps_done", 0)
         self.epsilon = checkpoint.get("epsilon", self.epsilon_end)
+        self.algorithm = checkpoint.get("algorithm", self.algorithm)
