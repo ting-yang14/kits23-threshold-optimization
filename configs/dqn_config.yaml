@@ -1,35 +1,36 @@
+algorithm: dqn
 agent:
   gamma: 0.99
   epsilon_start: 0.9
   epsilon_end: 0.05
   epsilon_decay: 1000
   memory_size: 10000
-  batch_size: 64
+  batch_size: 128
   learning_rate: 0.0001
   target_update: 1000
-  hidden_dim: 256
+  hidden_dim: 64
 train:
-  num_episodes: 50
-  max_steps: 3000
+  num_episodes: 300
+  max_steps: 5000
   learn_interval: 10
 env:
   train_data: ./data/rl_train.csv
   test_data: ./data/rl_test.csv
   rf_bounds:
-    - 0.85
-    - 0.95
+  - 0.89
+  - 0.93
   xgb_bounds:
-    - 0.9
-    - 1.0
+  - 0.96
+  - 1.0
   svm_bounds:
-    - 0.85
-    - 0.95
+  - 0.88
+  - 0.92
   reward_scheme:
-    - 1
-    - 1
-    - 0
-    - 0
+  - 1
+  - 1
+  - 0
+  - 0
   step_size: 0.01
-  num_clf: 1
+  num_clf: 2
   max_n_steps: 10000
   random_seed: 42

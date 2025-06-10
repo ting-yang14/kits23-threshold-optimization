@@ -58,11 +58,11 @@ def train_dqn(env, agent, num_episodes=1000, max_steps=500, learn_interval=10):
             episode_ground_truth, episode_predictions, zero_division=0
         )
 
-        rewards.append(episode_reward)
-        accuracies.append(np.round(episode_accuracy, 2))
-        precisions.append(np.round(episode_precision, 2))
-        recalls.append(np.round(episode_recall, 2))
-        f1s.append(np.round(episode_f1, 2))
+        rewards.append(round(episode_reward, 2))
+        accuracies.append(round(episode_accuracy, 2))
+        precisions.append(round(episode_precision, 2))
+        recalls.append(round(episode_recall, 2))
+        f1s.append(round(episode_f1, 2))
         # 打印進度
         if episode % 10 == 0:
             avg_reward = np.mean(rewards[-10:])
@@ -78,21 +78,21 @@ def train_dqn(env, agent, num_episodes=1000, max_steps=500, learn_interval=10):
             )
 
             # 儲存訓練記錄
-            run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            results = {
-                "episode": episode,
-                "avg_reward": float(avg_reward),
-                "avg_accuracy": float(avg_accuracy),
-                "avg_precision": float(avg_precision),
-                "avg_recall": float(avg_recall),
-                "avg_f1": float(avg_f1),
-                "epsilon": float(agent.epsilon),
-                "timestamp": run_id,
-            }
+            # run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # results = {
+            #     "episode": episode,
+            #     "avg_reward": float(avg_reward),
+            #     "avg_accuracy": float(avg_accuracy),
+            #     "avg_precision": float(avg_precision),
+            #     "avg_recall": float(avg_recall),
+            #     "avg_f1": float(avg_f1),
+            #     "epsilon": float(agent.epsilon),
+            #     "timestamp": run_id,
+            # }
 
-            progress_result_path = (
-                f"logs/progress/{agent.algorithm}_{run_id}_train_progress.json"
-            )
-            save_results_to_json(results, progress_result_path)
+            # progress_result_path = (
+            #     f"logs/progress/{agent.algorithm}_{run_id}_train_progress.json"
+            # )
+            # save_results_to_json(results, progress_result_path)
 
     return rewards, accuracies, precisions, recalls, f1s

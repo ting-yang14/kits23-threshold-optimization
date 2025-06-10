@@ -1,6 +1,4 @@
 import torch
-import time
-import matplotlib.pyplot as plt
 from datetime import datetime
 import numpy as np
 import argparse
@@ -102,11 +100,11 @@ def main(config_file="configs/dqn_config.yaml", algorithm="dqn"):
         "training_precision": precisions,
         "training_recall": recalls,
         "training_f1": f1s,
-        "test_reward": test_reward,
-        "test_accuracy": test_accuracy,
-        "test_precision": test_precision,
-        "test_recall": test_recall,
-        "test_f1": test_f1,
+        "test_reward": round(test_reward, 2),
+        "test_accuracy": round(test_accuracy, 2),
+        "test_precision": round(test_precision, 2),
+        "test_recall": round(test_recall, 2),
+        "test_f1": round(test_f1, 2),
         "config": config,
     }
 
@@ -115,9 +113,9 @@ def main(config_file="configs/dqn_config.yaml", algorithm="dqn"):
     save_results_to_json(results, training_results_path)
     print(f"Training results saved to {training_results_path}")
 
-    time.sleep(3)  # 等待文件系統穩定
+    # time.sleep(3)  # 等待文件系統穩定
     # 總結訓練結果
-    summarize_training_results("logs/train", "training_summary.csv")
+    # summarize_training_results("logs/train", "training_summary.csv")
 
 
 if __name__ == "__main__":
@@ -132,7 +130,7 @@ if __name__ == "__main__":
         "--algorithm",
         type=str,
         default="dqn",
-        choices=["dqn", "ddqn", "dueling_dqn"],
+        choices=["dqn", "ddqn", "dueling_dqn", "dueling_ddqn"],
         help="Algorithm type",
     )
     args = parser.parse_args()
