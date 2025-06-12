@@ -70,9 +70,18 @@ def summarize_training_results(
                     record[f"{prefix}_high"] = bounds[1]
 
             reward_scheme = env_config.get("reward_scheme")
-            if reward_scheme and len(reward_scheme) == 4:
-                record.update(dict(zip(["TP", "TN", "FP", "FN"], reward_scheme)))
+            if reward_scheme:
+                record.update(
+                    {
+                        k + "_reward": v
+                        for k, v in zip(["TP", "TN", "FP", "FN"], reward_scheme)
+                    }
+                )
 
+            test_confusion_matrix = data.get("test_confusion_matrix")
+            if test_confusion_matrix:
+                for k in ["TP", "TN", "FP", "FN"]:
+                    record[f"{k}_count"] = test_confusion_matrix.get(k, 0)
             new_records.append(record)
             print(f"已處理新檔案：{filename}")
 

@@ -83,7 +83,7 @@ def main(config_file="configs/dqn_config.yaml", algorithm="dqn"):
     ) = evaluate_agent(test_env, agent)
 
     confusion_matrix_path = f"logs/test/{algorithm}_{run_id}_confusion_matrix.png"
-    plot_confusion_matrix(
+    _, tn, fp, fn, tp = plot_confusion_matrix(
         y_true=ground_truth,
         y_pred=predictions,
         save_path=confusion_matrix_path,
@@ -105,6 +105,7 @@ def main(config_file="configs/dqn_config.yaml", algorithm="dqn"):
         "test_precision": round(test_precision, 2),
         "test_recall": round(test_recall, 2),
         "test_f1": round(test_f1, 2),
+        "test_confusion_matrix": {"TN": tn, "FP": fp, "FN": fn, "TP": tp},
         "config": config,
     }
 

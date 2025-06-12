@@ -36,7 +36,9 @@ def plot_confusion_matrix(y_true, y_pred, save_path, show=False):
     else:
         plt.close()
 
-    return cm
+    tn, fp, fn, tp = cm.ravel()
+
+    return cm, int(tn), int(fp), int(fn), int(tp)
 
 
 def plot_metrics_with_rewards(
