@@ -34,7 +34,15 @@ def main(config_file="configs/dqn_config.yaml", algorithm="dqn"):
     action_dim = train_env.action_space.n
     print(f"State dimension: {state_dim}, Action dimension: {action_dim}")
     # 創建 DQN 代理
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+
     print(f"Using device: {device}")
     agent = DQNAgent(
         state_dim, action_dim, device, algorithm=algorithm, **config["agent"]
@@ -113,10 +121,6 @@ def main(config_file="configs/dqn_config.yaml", algorithm="dqn"):
     training_results_path = f"logs/train/{algorithm}_{run_id}_train_results.json"
     save_results_to_json(results, training_results_path)
     print(f"Training results saved to {training_results_path}")
-
-    # time.sleep(3)  # 等待文件系統穩定
-    # 總結訓練結果
-    # summarize_training_results("logs/train", "training_summary.csv")
 
 
 if __name__ == "__main__":

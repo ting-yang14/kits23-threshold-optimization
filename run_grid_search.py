@@ -1,20 +1,17 @@
-import yaml
 import subprocess
 import itertools
 import time
-import os
 from utils.utils import load_config, save_config
 
 CONFIG_PATH = "configs/dqn_config.yaml"
-# CONFIG_PATH = "configs/dqn_config2.yaml"
 
 # 實驗設置
 algorithms = ["dqn", "ddqn", "dueling_dqn", "dueling_ddqn"]
 hidden_dims = [64]  # 128
-max_steps = [5000]  # 3000
-num_episodes = [500]  # 300
+max_steps = [500]  # 3000
+num_episodes = [300]  # 300
 num_clf_options = [1, 2, 3]
-batch_sizes = [64, 128]
+batch_sizes = [128]
 
 bound_sets = [
     # {
@@ -23,18 +20,25 @@ bound_sets = [
     #     "svm_bounds": [0.5, 1.0],
     # },
     {
-        "rf_bounds": [0.85, 0.95],
-        "xgb_bounds": [0.9, 1.0],
-        "svm_bounds": [0.85, 0.95],
+        "rf_bounds": [0.84, 0.90],
+        "xgb_bounds": [0.85, 0.95],
+        "svm_bounds": [0.89, 0.93],
     },
-    {
-        "rf_bounds": [0.89, 0.93],
-        "xgb_bounds": [0.96, 1.0],
-        "svm_bounds": [0.88, 0.92],
-    },
+    # {
+    #     "rf_bounds": [0.89, 0.93],
+    #     "xgb_bounds": [0.96, 1.0],
+    #     "svm_bounds": [0.88, 0.92],
+    # },
 ]
 # [TP, TN, FP, FN]
+# basic reward scheme
 reward_schemes = [[1, 1, 0, 0], [1, 1, -0.2, -0.8], [1, 2, 0, 0], [1, 2, -0.2, -0.8]]
+
+# various reward schemes
+# reward_schemes = []
+# for fp in [round(-0.2 * i, 1) for i in range(6)]:  # 0, -0.2, -0.4, ..., -1.0
+#     for fn in [round(-0.2 * j, 1) for j in range(6)]:
+#         reward_schemes.append([1, 1, fp, fn])
 
 
 def create_experiment_name(params):

@@ -18,3 +18,7 @@ wheels/
 *.csv
 *.xlsx
 *.txt
+*.docx
+*.png
+*.drawio
+*.pdf
